@@ -7,6 +7,7 @@ import { PinnedProvider, selfHostedBundleUrl } from "../../packages/web/src/harn
 const q = new URLSearchParams(location.search);
 const networks = (q.get("networks") ?? "passthrough,tor-js").split(",");
 const isolate = (q.get("isolate") ?? "").split(",");
+const useIframeUrl = q.get("iframe") === "1";
 const ECHO = "https://httpbin.org/anything";
 const RPC = "https://ethereum-rpc.publicnode.com";
 
@@ -56,6 +57,7 @@ for (const id of networks) {
     address: net.specifier,
     config: net.config as never,
     preExisting: { rpcProvider: provider },
+    ...(useIframeUrl ? { iframeUrl: "/anon-rpc-iframe.html" } : {}),
   });
   const workerLogs: unknown[] = [];
   (async () => {

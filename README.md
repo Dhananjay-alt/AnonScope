@@ -59,7 +59,7 @@ See `.env.example`.
 
 ```sh
 fly launch --no-deploy --copy-config          # pick a unique app name; edit fly.toml app + PUBLIC_ORIGIN
-fly volumes create anonscope_data --size 1 --region bom
+fly volumes create anonscope_data --size 1 --region sin
 fly secrets set RUNNER_TOKEN=$(openssl rand -hex 16)
 fly deploy
 curl -X POST https://<app>.fly.dev/rpc/mainnet/test/manual/baseline/- \

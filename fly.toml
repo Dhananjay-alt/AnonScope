@@ -1,7 +1,7 @@
 # Observer + dashboard on Fly.io. `*.fly.dev` gives public HTTPS without a domain.
 # Change `app` (it must be globally unique) and PUBLIC_ORIGIN to match.
 app = "anonscope"
-primary_region = "bom"
+primary_region = "sin"
 
 [build]
   dockerfile = "Dockerfile"

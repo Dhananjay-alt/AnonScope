@@ -3,7 +3,7 @@
 #   fly secrets set -c fly.runner.toml RUNNER_TOKEN=<same as observer>
 #   fly deploy -c fly.runner.toml
 app = "anonscope-runner"
-primary_region = "bom"
+primary_region = "sin"
 
 [build]
   dockerfile = "Dockerfile.runner"
