@@ -95,8 +95,8 @@ Per mechanism (`isokey`, `header`), from that variant's IP linkability:
 | `effective` | linkability ≤ 0.1 |
 | `partial` | 0.1 < linkability < 0.9 |
 | `none` | linkability ≥ 0.9 |
-| `unsupported` | more than 50% of the mechanism's calls failed while comparable no-key traffic worked (an error was raised) |
-| `inconclusive` | not enough data (fewer than 2 wallets seen, or everything failed) |
+| `unsupported` | more than 50% of the mechanism's calls failed, while no-key traffic worked **and** the network still worked afterwards (a later variant, or for the last variant the one before it, had ≤ 50% errors) |
+| `inconclusive` | not enough data: fewer than 2 wallets seen, everything failed, or the failures ran to the end of the run (the network went down mid-run rather than rejecting the mechanism) |
 
 ## Provider compatibility
 

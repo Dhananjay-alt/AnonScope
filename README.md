@@ -6,12 +6,17 @@ Anon-RPC lets wallets and dApps send RPC reads through anonymity networks (tor-j
 
 AnonScope is a live observatory. It runs a fixed experiment suite through every Anon-RPC network against an RPC endpoint we control, which logs exactly what a provider would see. It publishes a scoreboard covering bootstrap time, latency, overhead, error rate, **wallet unlinkability** (with and without isolation keys, and against a timing adversary), identifying-header leaks, real-IP leaks, and which public RPC providers accept each network. Wallets can consume the scores as JSON to choose a network.
 
-- **Live:** `https://<your-app>.fly.dev` *(fill in after `fly deploy`)*
-- **Scores for wallets:** `https://<your-app>.fly.dev/api/scores.json`
+- **Live:** https://anonscope.fly.dev (scoreboard) · https://anonscope.fly.dev/leak (leak view) · https://anonscope.fly.dev/methodology
+- **Scores for wallets:** https://anonscope.fly.dev/api/scores.json
+- **Code:** https://github.com/Dhananjay-alt/AnonScope
 
-![Leak view (local passthrough run)](docs/screenshot-leak-local.png)
+A headless runner on Fly.io (Singapore) runs the full suite against the live observer once an hour until 2026-11-10 06:00 IST, then the deployment stops (see [Cost guardrails](#cost-guardrails)).
 
-*Leak view from a local passthrough-only run: five wallets, one IP, all ten pairs linked. The right-hand graph shows the chosen network once runs from the deployed observer exist.*
+![Leak view, live run from Fly](docs/screenshot-leak.png)
+
+*Leak view from a scheduled run on Fly: five wallets over passthrough (left) and over Nym with `anonOptions.isolationKey` (right). In both, one exit IP links all ten wallet pairs.*
+
+![Scoreboard](docs/screenshot-scoreboard.png)
 
 ## Run it locally
 
@@ -22,7 +27,7 @@ pnpm i
 pnpm pin        # build-time: read the specifier contracts → packages/shared/src/pins.json,
                 # then download + keccak-verify each worker bundle → packages/web/public/bundles/
 pnpm dev        # observer on :8787 + Vite on :5173 (proxying /api, /rpc, /whoami)
-pnpm test       # 65 unit tests (analysis, observer, privacy, pacer, fixtures)
+pnpm test       # 69 unit tests (analysis, observer, privacy, egress cap, pacer, fixtures)
 ```
 
 `pins.json` is committed, so `pnpm bundles` alone is enough if you don't want to re-read the chain.
@@ -53,6 +58,7 @@ Locally only **passthrough** can reach your observer. Tor, Nym and Nox exits nee
 | `RUNNER_ORIGIN`, `RUNNER_NETWORKS`, `RUNNER_HEADLESS` (`new`/`old`/`false`), `RUNNER_TIMEOUT_MIN`, `RUNNER_INTERVAL_MIN` (loop only) | | runner |
 | `VITE_OBSERVER_ORIGIN` | same origin | web build: where probes/API go |
 | `VITE_BUNDLE_FALLBACK=1` | off | web build: let the harness fall back to the specifiers' CDN resolvers |
+| `VITE_VISITOR_TEST=1` | off | web build: show "Test from my browser" (runs over tor-js; hidden while tor-js doesn't boot) |
 
 See `.env.example`.
 
@@ -156,7 +162,7 @@ Every network request the app makes:
 | Worker bundle | build-time `pnpm bundles` → specifier resolvers (CDNs); runtime browser → **our observer** `/bundles/<hash>.js` | n/a (static, keccak-verified by the harness) | keeps visitors from contacting jsDelivr/unpkg/GitHub. `kps:` resolvers are listed as fallback |
 | `/whoami` | scheduled runner → observer, 3× per run | ❌ | ground truth for the real-IP-leak metric; scheduled runner only |
 | Run claim, upload + report (scheduled) | runner browser → observer `/api` | ❌ (not RPC) | our own runner |
-| Run claim, upload + report (visitor) | browser → **tor-js worker** → observer `/api` | ✅ | so the visitor's IP isn't linked to their run |
+| Run claim, upload + report (visitor; switched off while tor-js doesn't boot) | browser → **tor-js worker** → observer `/api` | ✅ | so the visitor's IP isn't linked to their run |
 | Dashboard, `scores.json`, app assets | browser → observer | n/a (not RPC) | static assets and results |
 
 Check: `grep -rn "fetch(" packages/web/src`. The only raw `fetch` calls are `lib/api.ts` (dashboard `/api` GETs) and `experiments/runSuite.ts` (`/whoami`, and scheduled-mode `/api`). Every RPC read uses `worker.fetch` via `harness/rpc.ts`.
@@ -168,24 +174,38 @@ Full write-up: [`docs/methodology.md`](docs/methodology.md), also rendered at `/
 - **Adversary:** an RPC provider seeing source IP, arrival time, headers and payload, trying to link 5 wallets of one user. JSON-RPC ids are random so they can't link requests.
 - **Experiments per network:** E1 boot · E2 15× `eth_blockNumber` · E3 5 fresh synthetic wallets × balance + nonce × 3 rounds, for each of `nokey`, `isokey` (`anonOptions.isolationKey`), `header` (`x-anon-rpc-isolation`), `isokey_jitter` · E5 `eth_chainId` to 6 keyless providers. At most 141 requests per network per run, paced to 55/min.
 - **IP linkability** = pairs sharing an exit within 60 s / C(5,2). **Timing linkability** = pairs not IP-linked whose requests coincide within 250 ms in ≥ 2 rounds. **Real-IP leak** = share of requests from the runner's own IPs. **Overhead** = p50(client ms − upstream ms), matched by request id.
-- **Verdict:** effective ≤ 0.1 < partial < 0.9 ≤ none; unsupported if the mechanism makes calls fail.
+- **Verdict:** effective ≤ 0.1 < partial < 0.9 ≤ none. *Unsupported* if the mechanism's calls fail while the network works before and after it; *inconclusive* if there's no data or the network itself went down.
 - **Scores:** median of the last 6 scheduled runs.
 
 ## Findings so far
 
-From Phase 0 spikes ([`docs/spike-findings.md`](docs/spike-findings.md)). Update with live scoreboard numbers once the observer has run for a while.
+From the scheduled runs on Fly.io (runner and observer in `sin`, headless Chromium, harness 0.4.0), as of 2026-11-06 10:00 UTC: **2 runs**, `c45dcf0b` and `d3182a6a`. The live scoreboard updates hourly. Spike results from a laptop are in [`docs/spike-findings.md`](docs/spike-findings.md) and aren't counted here.
 
-- **No pinned worker implements `isolationKey`.** None of the four bundles reads `anonOptions`. Live: passthrough and **Nym use one exit for every key**; **Nox rotates per request across 3 exits** regardless of key. Expected verdicts: none / none / partial.
-- **`x-anon-rpc-isolation` leaks.** Passthrough and Nox forward it to the destination, so the per-account key reaches the provider. Nym drops it but doesn't act on it.
-- **Header fingerprints:** passthrough sends the real browser UA + `Origin: null` + `Sec-Fetch-*`. Nox sends `Nox-Proxy/1.0`. Nym sends a fixed fake Chrome 131 UA + `Accept-Language: en-US`.
-- **Boot:** passthrough ~50 ms, Nox ~2 s, Nym ~8 s. **tor-js** couldn't bootstrap from our network on day 1: the demo gateway timed out (`kps: HELLO timeout`) while Nox's KPS worked fine.
-- **Specifier resolvers are third-party CDNs**, so a stock integration leaks each user's IP to jsDelivr/unpkg at boot. AnonScope self-hosts the hash-verified bytes instead.
+| | passthrough | Nym | Nox | tor-js |
+|---|---|---|---|---|
+| boot (median) | 117 ms | 12.6 s | 2.3 s | did not boot (120 s timeout, 2/2 runs) |
+| latency p50 / p95 | 196 / 220 ms | 1096 / 3234 ms | 1206 / 2607 ms | — |
+| overhead vs upstream (p50) | 16 ms | 921 ms | 1028 ms | — |
+| error rate | 0% | 0% | 78% (see below) | — |
+| exit IPs seen per run | 1 (the runner's own) | 1 (a different one each run) | 3 (the same 3 in both runs) | — |
+| IP linkability, no key | 1.00 | 1.00 | 1.00 | — |
+| `anonOptions.isolationKey` | none (1.00) | none (1.00) | inconclusive (no requests got through) | inconclusive |
+| `x-anon-rpc-isolation` header | none (1.00), header reaches the provider | none (1.00), header doesn't reach the provider | inconclusive | inconclusive |
+| identifying headers at the provider | browser UA, `Accept-Language`, `Origin: null`, `Sec-Fetch-*`, the isolation header | fixed Chrome UA, `Accept-Language: en-US` | `User-Agent: Nox-Proxy/1.0` | — |
+| providers reachable through it (E5) | 4/6 | 3/6 | 0/6 | — |
+
+- **Isolation keys don't separate wallets on any network that ran.** On passthrough and Nym, all five wallets of one user arrived from one IP in every variant, so the provider links all 10 pairs whether or not the wallet sets `isolationKey` or the header. That matches the bundles: none of the four pinned workers reads `anonOptions`.
+- **Nym** uses one exit per session. Across the two runs it was `217.118.194.66` and then `185.47.254.124`. It drops `x-anon-rpc-isolation`.
+- **Nox** spread the no-key requests over 3 AWS exits, but with 5 wallets polling within a minute, every pair still shared an exit (linkability 1.00). In both runs the Nox worker answered all 15 sequential E2 requests, then began returning `NoxWorkerError: network-error` about 30 s into the concurrent E3 phase and didn't recover for the rest of the run (E3 keyed variants and E5: 0 successes). Its isolation verdicts are therefore *inconclusive*, not *unsupported*. The cause isn't determined; a run from a residential connection in Mumbai earlier the same day completed all variants.
+- **tor-js** didn't boot from Fly either (as on day 1 from the laptop): the demo gateway in `adopters.json5` times out (`kps: HELLO timeout`). The scoreboard shows it as unavailable, and "Test from my browser", which runs over tor-js, is switched off.
+- **Timing linkability** is "—" everywhere: it only scores pairs that IP doesn't already link, and IP linked every pair.
+- **Specifier resolvers are third-party CDNs**, so a stock integration makes every user fetch the bundle from jsDelivr/unpkg at boot. AnonScope serves the hash-verified bytes itself.
 
 ## CROPS
 
 - **C (control):** We control only the observer domain and the runner. If they disappear, the repo still runs anywhere with one command (`pnpm bundles && pnpm build && pnpm start`), and `scores.json` is reproducible from the code. Networks are pinned by on-chain specifier hash. Bundles are served by us, but trust comes from the keccak hash, not from us.
 - **O (open):** MIT. Builds and runs from the repo alone. No accounts or API keys required.
-- **P (privacy):** The observer sees only synthetic probe traffic: random addresses and exit IPs, never visitor wallets. Only the `/rpc` probe route stores IPs. There is no request logging, and a test (`packages/observer/test/privacy.test.ts`) asserts that no other route writes an IP to the DB or console. Visitor runs register, upload and fetch reports **through Tor**. No analytics, trackers, web fonts or CDNs: the app ships a strict CSP (`script-src 'self'; connect-src 'self'`), worker bundles are self-hosted, and `pnpm check:dist` verifies the build. Data is deleted after 14 days.
+- **P (privacy):** The observer sees only synthetic probe traffic: random addresses and exit IPs, never visitor wallets. Only the `/rpc` probe route stores IPs. There is no request logging, and a test (`packages/observer/test/privacy.test.ts`) asserts that no other route writes an IP to the DB or console. Visitor runs (switched off until tor-js boots) register, upload and fetch reports **through Tor**. No analytics, trackers, web fonts or CDNs: the app ships a strict CSP (`script-src 'self'; connect-src 'self'`), worker bundles are self-hosted, and `pnpm check:dist` verifies the build. Data is deleted after 14 days.
 - **S (security):** No keys held: synthetic private keys are discarded as soon as the address is derived. The proxy only forwards `eth_chainId, eth_blockNumber, eth_getBalance, eth_getTransactionCount, eth_getCode, eth_call` (no batches), so it can't be used to send transactions. Rate limits: 60/min per run, 600/min global, one visitor run per 5 min, and scheduled runs need a token. The worker runs in the harness's null-origin sandbox, and its bytes are hash-verified before execution.
 
 ## AI usage disclosure
