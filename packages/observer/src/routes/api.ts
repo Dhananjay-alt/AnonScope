@@ -1,8 +1,16 @@
-// /api/* — run registration and upload. (Reports, scores and history: Phase 3.) These routes never read or
+// /api/* — run metadata, reports, scores, history. These routes never read or
 // store the requester's IP (plan rule 6; tested in test/privacy.test.ts).
 import { Hono } from "hono";
 import { z } from "zod";
-import { E3_VARIANTS, VARIANTS } from "@anonscope/shared";
+import {
+  buildRunReport,
+  buildScores,
+  historyPoints,
+  NETWORKS,
+  E3_VARIANTS,
+  VARIANTS,
+  type RunReport,
+} from "@anonscope/shared";
 import type { Deps } from "../app";
 import type { RunRow } from "../db";
 
@@ -47,9 +55,32 @@ const UploadBody = z.object({
   clientTimings: z.array(Timing).max(2000),
 });
 
+function toRecord(r: RunRow) {
+  return {
+    runId: r.runId,
+    mode: r.mode,
+    startedAt: r.startedAt ?? new Date(r.claimedAt).toISOString(),
+    ...(r.finishedAt ? { finishedAt: r.finishedAt } : {}),
+    realIps: r.realIps,
+    networks: r.networks,
+    clientTimings: r.clientTimings,
+  };
+}
+
 export function apiRoutes(deps: Deps) {
   const app = new Hono();
   const { store, config } = deps;
+
+  // Reports are immutable once a run is uploaded; cache them.
+  const reportCache = new Map<string, RunReport>();
+  function report(r: RunRow): RunReport {
+    const hit = reportCache.get(r.runId);
+    if (hit) return hit;
+    const rep = buildRunReport(toRecord(r), store.logsForRun(r.runId));
+    if (reportCache.size > 2000) reportCache.delete(reportCache.keys().next().value!);
+    reportCache.set(r.runId, rep);
+    return rep;
+  }
 
   app.post("/runs/claim", async (c) => {
     const parsed = ClaimBody.safeParse(await c.req.json().catch(() => null));
@@ -106,6 +137,49 @@ export function apiRoutes(deps: Deps) {
       networks: r.networks.map((n) => n.id),
     }));
     return c.json({ runs });
+  });
+
+  app.get("/runs/:runId/report", (c) => {
+    const runId = c.req.param("runId");
+    if (!RunId.safeParse(runId).success) return c.json({ error: "bad runId" }, 400);
+    const r = store.getRun(runId);
+    if (!r || r.uploadedAt === null) return c.json({ error: "no such run (or not uploaded yet)" }, 404);
+    return c.json({ ...report(r), source: r.source });
+  });
+
+  // "This is what the provider saw": the raw probe log of one run.
+  app.get("/runs/:runId/logs", (c) => {
+    const runId = c.req.param("runId");
+    if (!RunId.safeParse(runId).success) return c.json({ error: "bad runId" }, 400);
+    const r = store.getRun(runId);
+    if (!r || r.uploadedAt === null) return c.json({ error: "no such run" }, 404);
+    const network = c.req.query("network");
+    const variant = c.req.query("variant");
+    const rows = store
+      .logsForRun(runId)
+      .filter((x) => (!network || x.network === network) && (!variant || x.variant === variant));
+    return c.json({ rows });
+  });
+
+  let scoresCache: { at: number; body: unknown } | null = null;
+  deps.invalidate = () => {
+    scoresCache = null;
+  };
+  app.get("/scores.json", (c) => {
+    const now = deps.now();
+    if (!scoresCache || now - scoresCache.at > 60_000) {
+      const runs = store.listRuns("scheduled", 12).map(report);
+      scoresCache = { at: now, body: buildScores(NETWORKS, runs, config.publicOrigin, new Date(now)) };
+    }
+    c.header("cache-control", "public, max-age=60");
+    return c.json(scoresCache.body);
+  });
+
+  app.get("/history", (c) => {
+    const hours = Math.min(Math.max(Number(c.req.query("hours") ?? 24) || 24, 1), config.retentionDays * 24);
+    const network = c.req.query("network") || undefined;
+    const runs = store.runsSince("scheduled", deps.now() - hours * 3_600_000).map(report);
+    return c.json({ hours, points: historyPoints(runs, network) });
   });
 
   return app;
