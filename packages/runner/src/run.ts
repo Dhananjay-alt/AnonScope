@@ -27,6 +27,12 @@ export function optionsFromEnv(env = process.env): RunnerOptions {
   };
 }
 
+/** Leave 2 min (or a quarter of a short timeout) for boot, upload and a request in flight. */
+export function suiteBudgetSec(timeoutMs: number): number {
+  const margin = Math.min(120_000, timeoutMs / 4);
+  return Math.max(60, Math.floor((timeoutMs - margin) / 1000));
+}
+
 function launchOptions(o: RunnerOptions): LaunchOptions {
   const args = o.hostResolverRules ? [`--host-resolver-rules=${o.hostResolverRules}`] : [];
   if (o.headless === "false") return { headless: false, args };
@@ -40,6 +46,9 @@ export async function runOnce(o: RunnerOptions): Promise<{ ok: boolean; runId?: 
   url.searchParams.set("mode", "scheduled");
   url.searchParams.set("networks", o.networks);
   if (o.token) url.searchParams.set("token", o.token);
+  // The page stops its experiments before our timeout so it can still upload
+  // what it measured (see packages/web/src/experiments/budget.ts).
+  url.searchParams.set("budgetSec", String(suiteBudgetSec(o.timeoutMs)));
 
   const browser = await chromium.launch(launchOptions(o));
   try {

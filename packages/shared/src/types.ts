@@ -79,6 +79,8 @@ export interface NetworkRunMeta {
   booted: boolean;
   bootMs: number | null;
   bootError?: string;
+  /** Why the experiments for this network were cut short, if they were. */
+  stopped?: string;
   /** Variants that were run for E3 */
   variants: Variant[];
 }
@@ -139,6 +141,8 @@ export interface NetworkReport {
   booted: boolean;
   bootMs: number | null;
   bootError?: string;
+  /** Why the experiments for this network were cut short, if they were. */
+  stopped?: string;
   available: boolean;
   latencyMs: { p50: number | null; p95: number | null };
   overheadMsP50: number | null;

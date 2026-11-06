@@ -13,6 +13,7 @@ import { createWorker, type WorkerHandle } from "../harness/createWorker";
 import { anonFetch } from "../harness/rpc";
 import { Pacer } from "../harness/pacer";
 import { OBSERVER_ORIGIN } from "../lib/config";
+import { Deadline, e3NetworkDead } from "./budget";
 import type { ExperimentContext } from "./context";
 import { runE2 } from "./e2Latency";
 import { runE3Variant } from "./e3Unlinkability";
@@ -31,6 +32,8 @@ export interface SuiteOptions {
   token?: string;
   observer?: string;
   log?: (msg: string) => void;
+  /** Whole-run time budget. When it runs out, remaining work is skipped and the partial run is uploaded. */
+  budgetSec?: number;
 }
 
 export interface SuiteResult {
@@ -106,6 +109,7 @@ export async function runSuite(opts: SuiteOptions): Promise<SuiteResult> {
   const timings: ClientTiming[] = [];
   const metas: NetworkRunMeta[] = [];
   const pacer = new Pacer(PACE_PER_MIN, 60_000);
+  const deadline = Deadline.inSeconds(opts.budgetSec);
 
   const networkIds = opts.mode === "visitor" ? [VISITOR_NETWORK] : opts.networks;
   const variants = opts.mode === "visitor" ? VISITOR_VARIANTS : SCHEDULED_VARIANTS;
@@ -127,6 +131,10 @@ export async function runSuite(opts: SuiteOptions): Promise<SuiteResult> {
       const network = getNetwork(id);
       if (!network) {
         log(`skip unknown network ${id}`);
+        continue;
+      }
+      if (deadline.passed) {
+        log(`── ${id}: skipped, run deadline reached`);
         continue;
       }
       log(`── ${id}: booting (timeout 120 s)…`);
@@ -174,15 +182,27 @@ export async function runSuite(opts: SuiteOptions): Promise<SuiteResult> {
         pacer,
         log,
         record: (t) => timings.push(t),
+        deadline,
       };
-      await runE2(ctx);
-      if (network.mode === "full") {
+      const e2ok = await runE2(ctx);
+      if (e2ok === 0 && opts.mode === "scheduled") {
+        meta.stopped = "no E2 call succeeded; E3/E5 skipped";
+        log(`${id}: down, skipping E3/E5`);
+      } else if (network.mode === "full") {
+        const okPerVariant: number[] = [];
         for (const v of variants) {
-          await runE3Variant(ctx, v);
+          if (deadline.passed) break;
+          okPerVariant.push(await runE3Variant(ctx, v));
           meta.variants.push(v);
+          if (opts.mode === "scheduled" && e3NetworkDead(okPerVariant)) {
+            meta.stopped = `went down during E3 (after ${v}); rest skipped`;
+            log(`${id}: ${meta.stopped}`);
+            break;
+          }
         }
-        if (opts.mode === "scheduled") await runE5(ctx);
+        if (opts.mode === "scheduled" && !meta.stopped && !deadline.passed) await runE5(ctx);
       }
+      if (deadline.passed && !meta.stopped) meta.stopped = "run deadline reached; cut short";
       if (handle !== visitorHandle) handle.close();
     }
 

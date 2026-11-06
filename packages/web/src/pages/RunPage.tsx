@@ -19,6 +19,7 @@ export function RunPage() {
   const networks = (q.get("networks") ?? NETWORK_IDS.join(",")).split(",").filter(Boolean);
   const token = q.get("token") ?? undefined;
   const auto = q.get("auto") !== "0";
+  const budgetSec = Number(q.get("budgetSec")) || undefined;
 
   async function go() {
     if (started.current) return;
@@ -30,7 +31,7 @@ export function RunPage() {
       setLog((l) => [...l, line]);
     };
     try {
-      const r = await runSuite({ mode, networks, token, log: add });
+      const r = await runSuite({ mode, networks, token, log: add, budgetSec });
       window.__anonscopeDone = { ok: true, runId: r.runId };
       add(`done: /leak?run=${r.runId}`);
     } catch (e) {

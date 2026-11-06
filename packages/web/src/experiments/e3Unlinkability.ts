@@ -32,12 +32,17 @@ function optionsFor(variant: E3Variant, wallet: number): AnonCallOptions {
   }
 }
 
-export async function runE3Variant(ctx: ExperimentContext, variant: E3Variant): Promise<void> {
+/** Returns the number of successful calls. */
+export async function runE3Variant(ctx: ExperimentContext, variant: E3Variant): Promise<number> {
   const addrs = syntheticAddresses(K_WALLETS);
   let ok = 0;
   let total = 0;
   const t0 = Date.now();
   for (let round = 0; round < ROUNDS; round++) {
+    if (ctx.deadline.passed) {
+      ctx.log(`E3 ${variant}: run deadline reached after ${round} rounds`);
+      break;
+    }
     // Rounds fire every 5 s (later if the pacer has to hold us back).
     const due = t0 + round * ROUND_PERIOD_MS;
     if (Date.now() < due) await sleep(due - Date.now());
@@ -76,4 +81,5 @@ export async function runE3Variant(ctx: ExperimentContext, variant: E3Variant): 
     );
   }
   ctx.log(`E3 ${variant}: ${ok}/${total} ok`);
+  return ok;
 }

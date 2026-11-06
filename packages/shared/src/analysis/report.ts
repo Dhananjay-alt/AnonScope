@@ -119,6 +119,7 @@ export function buildNetworkReport(
     booted: meta.booted,
     bootMs: meta.bootMs,
     ...(meta.bootError ? { bootError: meta.bootError } : {}),
+    ...(meta.stopped ? { stopped: meta.stopped } : {}),
     available,
     latencyMs: { p50: round(percentile(okE2.map((t) => t.ms), 50)), p95: round(percentile(okE2.map((t) => t.ms), 95)) },
     overheadMsP50: round(percentile(overheads, 50)),

@@ -9,6 +9,10 @@ export const E5_TIMEOUT_MS = 20_000;
 export async function runE5(ctx: ExperimentContext): Promise<void> {
   const out: string[] = [];
   for (const p of PROVIDERS) {
+    if (ctx.deadline.passed) {
+      ctx.log(`E5: run deadline reached, skipping the remaining providers`);
+      break;
+    }
     const sentAt = Date.now();
     const r = await anonFetch(
       ctx.handle.worker,

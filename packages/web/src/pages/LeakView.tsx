@@ -140,6 +140,7 @@ export function LeakView() {
             </div>
           ) : null}
           {rightNet && !rightNet.booted && <div className="callout bad">{network} did not boot in this run: {rightNet.bootError}</div>}
+          {rightNet?.booted && rightNet.stopped && <div className="callout bad">{network} was cut short in this run: {rightNet.stopped}</div>}
           <LeakGraphs report={report} rows={rows} right={{ network, variant }} />
           <h2>This is what the provider saw</h2>
           <p className="muted small">

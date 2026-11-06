@@ -41,6 +41,7 @@ const NetMeta = z.object({
   booted: z.boolean(),
   bootMs: z.number().min(0).nullable(),
   bootError: z.string().max(500).optional(),
+  stopped: z.string().max(200).optional(),
   variants: z.array(z.enum(VARIANTS as unknown as [string, ...string[]])).max(E3_VARIANTS.length + 1),
 });
 
