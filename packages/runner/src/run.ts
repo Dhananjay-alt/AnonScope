@@ -11,6 +11,8 @@ export interface RunnerOptions {
   token?: string;
   headless: "new" | "old" | "false";
   timeoutMs: number;
+  /** Chromium --host-resolver-rules, e.g. "MAP app.fly.dev 1.2.3.4" (local DNS workarounds only). */
+  hostResolverRules?: string;
 }
 
 export function optionsFromEnv(env = process.env): RunnerOptions {
@@ -21,14 +23,16 @@ export function optionsFromEnv(env = process.env): RunnerOptions {
     token: env.RUNNER_TOKEN || undefined,
     headless: h === "false" || h === "old" ? h : "new",
     timeoutMs: Number(env.RUNNER_TIMEOUT_MIN || 15) * 60_000,
+    hostResolverRules: env.RUNNER_HOST_RESOLVER_RULES || undefined,
   };
 }
 
-function launchOptions(h: RunnerOptions["headless"]): LaunchOptions {
-  if (h === "false") return { headless: false };
+function launchOptions(o: RunnerOptions): LaunchOptions {
+  const args = o.hostResolverRules ? [`--host-resolver-rules=${o.hostResolverRules}`] : [];
+  if (o.headless === "false") return { headless: false, args };
   // "new": full Chromium in new headless mode; "old": chrome-headless-shell.
-  if (h === "new") return { headless: true, channel: "chromium" };
-  return { headless: true };
+  if (o.headless === "new") return { headless: true, channel: "chromium", args };
+  return { headless: true, args };
 }
 
 export async function runOnce(o: RunnerOptions): Promise<{ ok: boolean; runId?: string; error?: string }> {
@@ -37,7 +41,7 @@ export async function runOnce(o: RunnerOptions): Promise<{ ok: boolean; runId?: 
   url.searchParams.set("networks", o.networks);
   if (o.token) url.searchParams.set("token", o.token);
 
-  const browser = await chromium.launch(launchOptions(o.headless));
+  const browser = await chromium.launch(launchOptions(o));
   try {
     const page = await browser.newPage();
     let printed = 0;
