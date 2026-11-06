@@ -80,6 +80,19 @@ describe("buildNetworkReport", () => {
     expect(r.variants.header?.verdict).toBe("unsupported");
   });
 
+  it("network down mid-run (every later variant fails too) is 'inconclusive', not 'unsupported'", () => {
+    const e3 = (variant: string, ok: boolean) =>
+      Array.from({ length: 30 }, () => timing({ experiment: "E3", variant: variant as never, ok, ...(ok ? {} : { error: "timeout" }) }));
+    const timings = [...e3("nokey", true), ...e3("isokey", false), ...e3("header", false), ...e3("isokey_jitter", false)];
+    const r = buildNetworkReport(meta(), [], timings, []);
+    expect(r.variants.isokey?.verdict).toBe("inconclusive");
+    expect(r.variants.header?.verdict).toBe("inconclusive");
+    expect(r.variants.isokey_jitter?.verdict).toBe("inconclusive");
+    // ...but a mechanism that fails while a later variant works is still blamed.
+    const t2 = [...e3("nokey", true), ...e3("isokey", false), ...e3("header", true), ...e3("isokey_jitter", true)];
+    expect(buildNetworkReport(meta(), [], t2, []).variants.isokey?.verdict).toBe("unsupported");
+  });
+
   it("real-IP leak, header leaks, providers", () => {
     const rows = [
       row({ wallet: "0", srcIp: "203.0.113.5", tsMs: 0, headers: { "user-agent": "UA", origin: "null" } }),

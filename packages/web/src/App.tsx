@@ -4,6 +4,7 @@ import { LeakView } from "./pages/LeakView";
 import { TestMyBrowser } from "./pages/TestMyBrowser";
 import { Methodology } from "./pages/Methodology";
 import { RunPage } from "./pages/RunPage";
+import { VISITOR_TEST_ENABLED } from "./lib/config";
 
 export function App() {
   return (
@@ -15,7 +16,7 @@ export function App() {
         <nav>
           <NavLink to="/" end>Scoreboard</NavLink>
           <NavLink to="/leak">Leak view</NavLink>
-          <NavLink to="/test">Test from my browser</NavLink>
+          {VISITOR_TEST_ENABLED && <NavLink to="/test">Test from my browser</NavLink>}
           <NavLink to="/methodology">Methodology</NavLink>
         </nav>
         <span className="spacer" />
@@ -25,7 +26,19 @@ export function App() {
         <Routes>
           <Route path="/" element={<Scoreboard />} />
           <Route path="/leak" element={<LeakView />} />
-          <Route path="/test" element={<TestMyBrowser />} />
+          <Route
+            path="/test"
+            element={
+              VISITOR_TEST_ENABLED ? (
+                <TestMyBrowser />
+              ) : (
+                <p>
+                  The in-browser test runs over tor-js, which isn't booting right now (its demo gateway times out).
+                  It's switched off until it does. <NavLink to="/">Back to the scoreboard</NavLink>
+                </p>
+              )
+            }
+          />
           <Route path="/methodology" element={<Methodology />} />
           <Route path="/run" element={<RunPage />} />
           <Route path="*" element={<p>Not found. <NavLink to="/">Back to the scoreboard</NavLink></p>} />

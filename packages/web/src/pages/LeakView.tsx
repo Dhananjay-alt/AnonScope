@@ -44,7 +44,7 @@ export function LeakView() {
   const [runId, setRunId] = useState<string>("");
   const [report, setReport] = useState<(RunReport & { source?: string }) | null>(null);
   const [rows, setRows] = useState<LogRow[]>([]);
-  const [network, setNetwork] = useState("tor-js");
+  const [network, setNetwork] = useState("");
   const [variant, setVariant] = useState<Variant>("isokey");
   const [err, setErr] = useState<string | null>(null);
 
@@ -68,7 +68,11 @@ export function LeakView() {
         setReport(rep);
         setRows(lg);
         if (!rep.networks.some((n) => n.id === network)) {
-          const alt = rep.networks.find((n) => n.id !== "passthrough") ?? rep.networks[0];
+          // Prefer a network that actually booted, so the right card has data.
+          const alt =
+            rep.networks.find((n) => n.id !== "passthrough" && n.booted) ??
+            rep.networks.find((n) => n.id !== "passthrough") ??
+            rep.networks[0];
           if (alt) setNetwork(alt.id);
         }
       },
@@ -96,7 +100,7 @@ export function LeakView() {
       {err && <div className="callout bad">{err}</div>}
       {runs && runs.length === 0 && (
         <div className="callout warn">
-          No scheduled runs yet. Run <code>pnpm runner</code> or try <Link to="/test">Test from my browser</Link>.
+          No scheduled runs yet. Run <code>pnpm runner</code>.
         </div>
       )}
       {runs && runs.length > 0 && (

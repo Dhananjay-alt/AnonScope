@@ -29,6 +29,8 @@ function Row({ s }: { s: NetworkScore }) {
   const okProviders = Object.values(s.providers).filter((v) => v === "ok").length;
   const nProviders = Object.keys(s.providers).length;
   const none = s.runsConsidered === 0;
+  // Ran but never got traffic through (e.g. didn't boot): don't show 0 exits / "no leaks" as if measured.
+  const noTraffic = none || s.errorRate === null;
   return (
     <tr>
       <td>
@@ -59,10 +61,10 @@ function Row({ s }: { s: NetworkScore }) {
         {fmtFrac(s.timingLinkability.isokey)}
         <div className="muted small">jitter {fmtFrac(s.timingLinkability.isokey_jitter)}</div>
       </td>
-      <td className="num">{s.distinctExits ?? "—"}</td>
+      <td className="num">{noTraffic ? "—" : (s.distinctExits ?? "—")}</td>
       <td className="num" style={{ color: s.realIpLeak ? "var(--red)" : undefined }}>{fmtPct(s.realIpLeak)}</td>
       <td className="small mono" title={s.headerLeaks.join("\n")}>
-        {none ? "—" : s.headerLeaks.length === 0 ? <span style={{ color: "var(--green)" }}>none</span> : <HeaderList names={s.headerLeaks} />}
+        {noTraffic ? "—" : s.headerLeaks.length === 0 ? <span style={{ color: "var(--green)" }}>none</span> : <HeaderList names={s.headerLeaks} />}
       </td>
       <td className="num" title={Object.entries(s.providers).map(([k, v]) => `${k}: ${v}`).join("\n")}>
         {nProviders ? `${okProviders}/${nProviders}` : "—"}

@@ -83,20 +83,31 @@ export function buildNetworkReport(
 
   const variantsSeen = new Set<Variant>(meta.variants);
   for (const r of rows) if (r.wallet !== "-") variantsSeen.add(r.variant as Variant);
-  // Reference error rate for "did the isolation mechanism itself fail?":
-  // the E3 no-key variant, else E2 (also no-key traffic).
+  // Reference error rate for "did the isolation mechanism itself fail?": the
+  // E3 no-key variant (else E2, also no-key traffic). Variants run in
+  // VARIANT_ORDER, so a variant is only blamed if the network still worked
+  // afterwards too: when the failures run to the end of the run, the network
+  // went down mid-run and the verdict is inconclusive, not "unsupported".
   const nokeyER = errorRate(e3.filter((t) => t.variant === "nokey")) ?? errorRate(e2);
+  const order = VARIANT_ORDER.filter((v) => variantsSeen.has(v));
+  const erOf = new Map(order.map((v) => [v, errorRate(e3.filter((t) => t.variant === v))] as const));
   const variants: NetworkReport["variants"] = {};
-  for (const v of VARIANT_ORDER) {
-    if (!variantsSeen.has(v)) continue;
+  order.forEach((v, i) => {
+    // Later variants; for the last one, the keyed variant just before it.
+    const pool = order.slice(i + 1).length
+      ? order.slice(i + 1)
+      : order.slice(0, i).filter((w) => w !== "nokey" && w !== "baseline").slice(-1);
+    const later = pool.map((w) => erOf.get(w)).filter((x): x is number => x !== null && x !== undefined);
+    const reference =
+      later.length === 0 || nokeyER === null ? nokeyER : Math.max(nokeyER, Math.min(...later));
     variants[v] = buildVariantReport(
       v,
       rows.filter((r) => r.variant === v),
       e3.filter((t) => t.variant === v),
-      nokeyER,
+      reference,
       opts,
     );
-  }
+  });
 
   const providers: Record<string, string> = {};
   for (const t of e5) if (t.provider) providers[t.provider] = t.ok ? "ok" : (t.error ?? "error");
