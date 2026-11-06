@@ -49,7 +49,8 @@ Locally only **passthrough** can reach your observer. Tor, Nym and Nox exits nee
 | `RUNNER_TOKEN` | *(empty: scheduled runs open)* | required to claim `mode: scheduled` runs |
 | `SEED_FIXTURE` | — | import a recorded run at startup |
 | `CSP` | `strict` | `off` disables the app's Content-Security-Policy |
-| `RUNNER_ORIGIN`, `RUNNER_NETWORKS`, `RUNNER_HEADLESS` (`new`/`old`/`false`), `RUNNER_INTERVAL_MIN` | | runner |
+| `EGRESS_CAP_GB` | `2` | observer: outgoing-data cap per UTC day (see Cost guardrails) |
+| `RUNNER_ORIGIN`, `RUNNER_NETWORKS`, `RUNNER_HEADLESS` (`new`/`old`/`false`), `RUNNER_TIMEOUT_MIN`, `RUNNER_INTERVAL_MIN` (loop only) | | runner |
 | `VITE_OBSERVER_ORIGIN` | same origin | web build: where probes/API go |
 | `VITE_BUNDLE_FALLBACK=1` | off | web build: let the harness fall back to the specifiers' CDN resolvers |
 
@@ -61,19 +62,47 @@ See `.env.example`.
 fly launch --no-deploy --copy-config          # pick a unique app name; edit fly.toml app + PUBLIC_ORIGIN
 fly volumes create anonscope_data --size 1 --region sin
 fly secrets set RUNNER_TOKEN=$(openssl rand -hex 16)
-fly deploy
-curl -X POST https://<app>.fly.dev/rpc/mainnet/test/manual/baseline/- \
-  -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+fly deploy --ha=false                         # exactly one machine
+curl https://<app>.fly.dev/api/health
 
-# scheduled runner (separate app: headless Chromium every 30 min)
-fly launch --no-deploy -c fly.runner.toml --copy-config   # set RUNNER_ORIGIN to the observer URL
-fly secrets set -c fly.runner.toml RUNNER_TOKEN=<same token>
-fly deploy -c fly.runner.toml
+# scheduled runner: separate app, one machine that Fly starts hourly; each start
+# runs the suite once (hard cap 20 min) and the machine stops when it exits
+fly apps create <app>-runner                  # set app + RUNNER_ORIGIN in fly.runner.toml
+fly secrets set -a <app>-runner RUNNER_TOKEN=<same token>
+fly deploy -c fly.runner.toml --ha=false
+fly machine update <id> -a <app>-runner --schedule hourly --restart no --skip-start -y
 ```
 
 Or run the loop on any machine with a browser: `RUNNER_ORIGIN=https://<app>.fly.dev RUNNER_TOKEN=… pnpm runner:loop`. Any VPS with Caddy in front of `pnpm start` also works. Set `TRUSTED_IP_HEADER` to whatever the proxy writes.
 
 Backup demo data: after a good run, `pnpm seed export <runId> --db <db>` writes `fixtures/demo-run.json`. Set `SEED_FIXTURE=/app/fixtures/demo-run.json` (or run `pnpm seed import`) to load it anywhere. Fixtures are labelled "recorded" in the UI and are never deleted by retention.
+
+## Cost guardrails
+
+Live from 2026-11-06 to the kill switch on **2026-11-10 06:00 IST**, in Fly region `sin`:
+
+| guard | where |
+|---|---|
+| Observer: 1 machine, shared-cpu-1x / 512 MB, always on | `fly.toml`, `fly deploy --ha=false` |
+| Runner: 1 machine, shared-cpu-2x / 2 GB, started hourly, `timeout 20m`, then stops | `fly.runner.toml`, `Dockerfile.runner` |
+| Volume: one 1 GB volume, no auto-extend | `fly.toml` |
+| IPs: shared IPv4 + IPv6 only | watchdog releases any dedicated IPv4 |
+| Watchdog (hourly): destroys machines beyond 1 per app, stops the runner after 25 min, releases dedicated IPv4, alerts on extra volumes | `.github/workflows/watchdog.yml` |
+| Kill switch: stops both apps at `KILL_AT` and keeps them stopped (observer autostart off, runner schedule removed); destroys nothing | `.github/workflows/killswitch.yml` |
+| Outgoing data: above 2 GB per UTC day, dashboard/static/API answer 503; `/rpc` probes keep working (with their rate limits). Counter at `/api/health` | `packages/observer/src/egress.ts` |
+
+The workflows need two repo secrets, each a deploy token scoped to one app: `FLY_TOKEN_OBSERVER` (`fly tokens create deploy -a anonscope -x 168h`) and `FLY_TOKEN_RUNNER` (same, `-a anonscope-runner`). Run either workflow manually and it defaults to a dry run.
+
+**Worst case up to Nov 10 ≈ $3.0, under $3.3 / ₹290.** That's 87 h at Fly's prices (docs.fly.io/about/pricing, 2026-11-06, `sin` ≈ 1.27× the listed rate): observer $0.57, runner $2.05 *if it ran nonstop* (with the guards it runs ≤ 20 min/h, ≈ $0.4–0.7), egress 2 GB/day × $0.04 ≈ $0.29, volume + stopped rootfs ≈ $0.07, shared IPv4 free.
+
+**Manual kill:**
+
+```sh
+fly scale count 0 -a anonscope --yes
+fly scale count 0 -a anonscope-runner --yes
+```
+
+`scale count 0` **destroys** the machines. The volume, its data, IPs and secrets stay, and `fly deploy` recreates the machines. To stop them without destroying anything, do what the kill switch does: `fly machine stop <id> -a <app>`, then for the observer `fly machine update <id> -a anonscope --autostart=false --skip-start -y` (otherwise traffic wakes it).
 
 ## Architecture
 

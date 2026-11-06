@@ -8,6 +8,7 @@ import { sourceIp } from "./ip";
 import { rpcRoutes } from "./routes/rpc";
 import { apiRoutes } from "./routes/api";
 import type { FetchLike } from "./rpcProxy";
+import { egressMeter, egressMiddleware, type EgressMeter } from "./egress";
 
 export interface Deps {
   config: Config;
@@ -20,6 +21,8 @@ export interface Deps {
   invalidate?: () => void;
   /** CSP for HTML documents; "off" disables */
   csp?: "strict" | "off";
+  /** outgoing-data counter; created from config.egressCapBytes if absent */
+  egress?: EgressMeter;
 }
 
 /**
@@ -47,6 +50,11 @@ export const APP_CSP = [
 export function createApp(deps: Deps) {
   const app = new Hono();
   const csp = deps.csp ?? "strict";
+  const egress = deps.egress ?? egressMeter(deps.store, deps.config.egressCapBytes, deps.now);
+
+  // Outermost: counts every byte written, and above the daily cap answers 503
+  // on everything except /rpc probes, /whoami and health.
+  app.use("*", egressMiddleware(egress));
 
   // CORS: probes come from the harness's null-origin sandbox (passthrough) or
   // from exits that do not send an Origin at all. No credentials anywhere.
@@ -65,6 +73,9 @@ export function createApp(deps: Deps) {
     c.header("cache-control", c.res.headers.get("cache-control") ?? "no-store");
   });
   app.options("/api/*", (c) => c.body(null, 204));
+
+  // Health + cost counter. Aggregate bytes only; nothing about requesters.
+  app.get("/api/health", (c) => c.json({ ok: true, egress: egress.status() }));
 
   app.route("/rpc", rpcRoutes(deps));
   app.route("/api", apiRoutes(deps));

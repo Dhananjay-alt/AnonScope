@@ -1,5 +1,8 @@
 # Observer + dashboard on Fly.io. `*.fly.dev` gives public HTTPS without a domain.
 # Change `app` (it must be globally unique) and PUBLIC_ORIGIN to match.
+# Cost guard: exactly one always-on shared-cpu-1x/512 MB machine. Deploy with
+#   fly deploy --ha=false
+# (Fly has no "max machines" setting; .github/workflows/watchdog.yml enforces 1.)
 app = "anonscope"
 primary_region = "sin"
 
@@ -15,9 +18,11 @@ primary_region = "sin"
   UPSTREAM_RPC_SEPOLIA = "https://ethereum-sepolia-rpc.publicnode.com"
   # SEED_FIXTURE = "/app/fixtures/demo-run.json"
 
+# Cost guard: 1 GB, no auto-extend (no auto_extend_size_* keys).
 [[mounts]]
   source = "anonscope_data"
   destination = "/data"
+  initial_size = "1gb"
 
 [http_service]
   internal_port = 8080

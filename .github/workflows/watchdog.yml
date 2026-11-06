@@ -1,0 +1,38 @@
+# Hourly Fly.io cost watchdog (scripts/watchdog.mjs).
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   FLY_TOKEN_OBSERVER = output of: fly tokens create deploy -a anonscope -x 168h
+#   FLY_TOKEN_RUNNER   = output of: fly tokens create deploy -a anonscope-runner -x 168h
+# A failed run (any action taken or alert raised) triggers GitHub's failure email.
+name: watchdog
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print what would be done"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-guard
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Check Fly apps
+        env:
+          # Scheduled runs act; manual runs default to dry-run.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          FLY_TOKEN_OBSERVER: ${{ secrets.FLY_TOKEN_OBSERVER }}
+          FLY_TOKEN_RUNNER: ${{ secrets.FLY_TOKEN_RUNNER }}
+        run: node scripts/watchdog.mjs

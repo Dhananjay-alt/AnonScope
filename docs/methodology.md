@@ -17,6 +17,10 @@ The probe URL path carries ground-truth labels (`/rpc/:chain/:runId/:network/:va
 
 Every probe address is freshly generated (`generatePrivateKey()` → address, key discarded at once) and fresh **per variant**, so variants can't be linked to each other by address.
 
+## Where it runs
+
+The observer and the scheduled runner both run on Fly.io in **Singapore (`sin`)**. Mumbai (`bom`) isn't offered (`fly platform regions`, 2026-11-06), and `sin` is the nearest region. Running them in the same region means the passthrough baseline's latency is close to an intra-region round trip, and the runner's real IP (the ground truth for the real-IP leak) is a Fly egress address, not a residential one.
+
 ## Experiments
 
 | | What | Requests per network |

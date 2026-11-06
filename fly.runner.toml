@@ -1,7 +1,15 @@
-# The scheduled runner as its own Fly app (no public services).
-#   fly launch --no-deploy -c fly.runner.toml --copy-config
-#   fly secrets set -c fly.runner.toml RUNNER_TOKEN=<same as observer>
-#   fly deploy -c fly.runner.toml
+# The scheduled runner as its own Fly app (no public services, no IPs).
+# Cost guard: exactly one shared-cpu-2x/2 GB machine that Fly starts once an
+# hour. Each start runs the suite once under `timeout 20m`; when the process
+# exits the machine stops (restart policy "no"), success or failure.
+#
+# First time:
+#   fly apps create anonscope-runner
+#   fly secrets set -a anonscope-runner RUNNER_TOKEN=<same as observer>
+#   fly deploy -c fly.runner.toml --ha=false
+#   fly machine update <id> -a anonscope-runner --schedule hourly --restart no -y
+# Fly can't set the schedule from fly.toml, so check it after each deploy:
+#   fly machine status <id> -a anonscope-runner   (schedule: hourly)
 app = "anonscope-runner"
 primary_region = "sin"
 
@@ -10,11 +18,14 @@ primary_region = "sin"
 
 [env]
   RUNNER_ORIGIN = "https://anonscope.fly.dev"
-  RUNNER_NETWORKS = "passthrough,tor-js,nym,nox"
-  RUNNER_INTERVAL_MIN = "30"
+  RUNNER_NETWORKS = "passthrough,nym,nox,tor-js"
   RUNNER_HEADLESS = "new"
+  # The page gives up after 18 min; `timeout 20m` in Dockerfile.runner is the hard cap.
+  RUNNER_TIMEOUT_MIN = "18"
+
+[[restart]]
+  policy = "never"
 
 [[vm]]
+  size = "shared-cpu-2x"
   memory = "2gb"
-  cpu_kind = "shared"
-  cpus = 2

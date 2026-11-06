@@ -68,6 +68,11 @@ CREATE TABLE IF NOT EXISTS runs (
   source TEXT NOT NULL DEFAULT 'live'
 );
 CREATE INDEX IF NOT EXISTS runs_mode_started ON runs(mode, started_at);
+-- Outgoing bytes per UTC day (cost guard). Counts only; no IPs, no paths.
+CREATE TABLE IF NOT EXISTS egress_daily (
+  day TEXT PRIMARY KEY,
+  bytes INTEGER NOT NULL
+);
 `;
 
 type RawLog = {
@@ -161,8 +166,19 @@ export function openStore(path: string) {
     `SELECT * FROM runs WHERE mode = ? AND uploaded_at IS NOT NULL AND claimed_at >= ? ORDER BY started_at DESC`,
   );
 
+  const egressGetQ = db.prepare(`SELECT bytes FROM egress_daily WHERE day = ?`);
+  const egressAddQ = db.prepare(
+    `INSERT INTO egress_daily (day, bytes) VALUES (?, ?) ON CONFLICT(day) DO UPDATE SET bytes = bytes + excluded.bytes`,
+  );
+
   return {
     db,
+    egressBytes(day: string): number {
+      return (egressGetQ.get(day) as { bytes: number } | undefined)?.bytes ?? 0;
+    },
+    addEgress(day: string, bytes: number): void {
+      egressAddQ.run(day, bytes);
+    },
     insertLog(row: NewLogRow): void {
       insLog.run({
         ...row,

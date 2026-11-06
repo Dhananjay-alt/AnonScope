@@ -14,6 +14,8 @@ export interface Config {
   visitorRunGapMs: number;
   retentionDays: number;
   upstreamTimeoutMs: number;
+  /** Outgoing bytes per UTC day above which dashboard/static/API answer 503 (/rpc keeps working). */
+  egressCapBytes: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -39,5 +41,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     visitorRunGapMs: num("VISITOR_RUN_GAP_SEC", 300) * 1000,
     retentionDays: num("RETENTION_DAYS", 14),
     upstreamTimeoutMs: num("UPSTREAM_TIMEOUT_MS", 20_000),
+    egressCapBytes: num("EGRESS_CAP_GB", 2) * 1e9,
   };
 }

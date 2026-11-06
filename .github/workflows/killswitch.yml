@@ -1,0 +1,56 @@
+# Kill switch: from KILL_AT on, stop both Fly apps and keep them stopped
+# (scripts/killswitch.mjs). Nothing is destroyed; `fly deploy` brings them back.
+# GitHub cron has no year, so the cron fires every 30 min and the script
+# compares the time with KILL_AT; before it, the job exits in seconds.
+# Uses the same repo secrets as watchdog.yml.
+name: killswitch
+
+on:
+  schedule:
+    - cron: "0,30 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print what would be done"
+        type: boolean
+        default: true
+      force:
+        description: "Ignore KILL_AT (combine with dry_run to test)"
+        type: boolean
+        default: false
+
+env:
+  # The only place the date lives. 2026-11-10 06:00 IST = 2026-11-10 00:30 UTC.
+  KILL_AT: "2026-11-10T06:00:00+05:30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-guard
+  cancel-in-progress: false
+
+jobs:
+  killswitch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Too early?
+        id: gate
+        run: |
+          if [ "$(date -u +%s)" -ge "$(date -u -d "$KILL_AT" +%s)" ] || [ "${{ inputs.force }}" = "true" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Before $KILL_AT; nothing to do."
+          fi
+      - if: steps.gate.outputs.go == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - if: steps.gate.outputs.go == 'true'
+        name: Stop both apps
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          FORCE: ${{ inputs.force && 'true' || 'false' }}
+          FLY_TOKEN_OBSERVER: ${{ secrets.FLY_TOKEN_OBSERVER }}
+          FLY_TOKEN_RUNNER: ${{ secrets.FLY_TOKEN_RUNNER }}
+        run: node scripts/killswitch.mjs
