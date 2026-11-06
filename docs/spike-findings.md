@@ -44,7 +44,7 @@ Specifier addresses are copied from `adopters.json5`. `workerHash` and resolvers
 
 None of the four bundles contains `/ethereum-rpc`. All are general-web-access workers, so no network is `latencyOnly`. The `latencyOnly` code path exists in case one changes.
 
-**Finding (CROPS):** every specifier's resolver list points at third-party CDNs (jsDelivr, unpkg, raw.githubusercontent.com) plus `kps:` gateways. A host using the harness as documented makes every visitor's browser request the bundle from a CDN. Resolvers are advisory and the hash is the identity (SPEC §4), so AnonScope downloads and verifies the bytes at build time (`pnpm bundles`) and its `PinnedProvider` returns our own same-origin URL first, followed by the network's `kps:` entries. CDN fallback is opt-in (`VITE_BUNDLE_FALLBACK=1`).
+**Finding (privacy):** every specifier's resolver list points at third-party CDNs (jsDelivr, unpkg, raw.githubusercontent.com) plus `kps:` gateways. A host using the harness as documented makes every visitor's browser request the bundle from a CDN. Resolvers are advisory and the hash is the identity (SPEC §4), so AnonScope downloads and verifies the bytes at build time (`pnpm bundles`) and its `PinnedProvider` returns our own same-origin URL first, followed by the network's `kps:` entries. CDN fallback is opt-in (`VITE_BUNDLE_FALLBACK=1`).
 
 ## S3: what arrives at the server (headers, IP)
 

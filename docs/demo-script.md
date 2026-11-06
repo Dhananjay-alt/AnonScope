@@ -21,5 +21,5 @@ Flip the variant to `x-anon-rpc-isolation header` and point at the log table's "
 **2:10–2:40 · scores.json.** `/api/scores.json`
 > "A wallet can fetch this and pick the best network automatically. Open source, runs every 30 minutes, MIT."
 
-**2:40–3:00 · The CROPS moment.** Terminal: `fly logs`.
+**2:40–3:00 · The privacy moment.** Terminal: `fly logs`.
 > "Our server logs nothing about visitors: no request logging, and only the probe route stores IPs, which are exit IPs of our own synthetic traffic. No analytics, no CDNs: even the worker bundles are self-hosted and hash-verified."

@@ -5,7 +5,7 @@
 // Why: the specifier's resolvers are third-party CDNs (jsDelivr, unpkg,
 // GitHub). Resolvers are advisory and the hash is the identity (SPEC §4), so
 // serving the verified bytes from our own origin keeps visitors' browsers from
-// contacting a CDN (CROPS: no third-party requests from the client).
+// contacting a CDN (privacy: no third-party requests from the client).
 //
 //   pnpm bundles
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

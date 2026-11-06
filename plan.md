@@ -1,7 +1,7 @@
 # AnonScope — an observatory for Anon-RPC
 
 > Working name; rename freely. Built from scratch at ETHGlobal Mumbai (Nov 6–8, 2026).
-> Target prize: **Ethereum Foundation — 🕶️ Best Use of Anon-RPC ($5,000)**, also submitted to **🌾 Best CROPS App** (EF places each project in at most one EF prize).
+> Target prize: **Ethereum Foundation — 🕶️ Best Use of Anon-RPC ($5,000)**. This is the only track we submit to (decided 2026-11-06: not Best CROPS App).
 
 ---
 
@@ -21,7 +21,7 @@ You are building this project from this file. Work **phase by phase**, in order.
 2. **Every Ethereum RPC read made by the app goes through `@anon-rpc/browser-harness`.** This is the prize's qualification rule. The "unprotected baseline" uses the official **passthrough** network, never a raw `fetch()` to an RPC. Any exception must be listed in the README's traffic disclosure table (§10).
 3. **Use synthetic test wallets only.** Probes query random, freshly generated addresses. Never ask for or query a visitor's real wallet.
 4. **Be gentle with shared infrastructure.** The tor-js demo gateways are small and shared with every team at the venue. Respect the request budgets in §6.6. No load testing.
-5. **No third-party analytics, trackers, fonts or CDNs in the client** (CROPS rule). Bundle everything.
+5. **No third-party analytics, trackers, fonts or CDNs in the client** (privacy rule). Bundle everything.
 6. **Only log IPs where the design says to.** The observer logs source IPs only on `/rpc/*` probe routes, which carry our own synthetic traffic. Dashboard and API routes must not log visitor IPs.
 7. TypeScript `strict` everywhere. Small commits with clear messages. Add a test for each analysis function.
 8. When a phase has a **GATE**, stop and report the findings before building on assumptions that failed.
@@ -46,8 +46,6 @@ This is an idea EF explicitly listed for this track: *"network health checker / 
 | How much traffic goes through Anon-RPC | 100% of RPC reads. Exceptions are disclosed in the README table (§10). |
 | Could ship after the hackathon | Continuous scheduled runs, a public `scores.json` for wallets, MIT license, one-command deploy. |
 | Technical depth | Unlinkability methodology (IP and timing adversary), header-leak analysis, network overhead vs upstream time, per-network isolation-mechanism tests. |
-
-CROPS extras (for the second EF submission): MIT license, README `## CROPS` section, no trackers.
 
 ---
 
@@ -159,7 +157,7 @@ Docs recommend **one long-lived worker per network**. Spec §9.1: the harness mu
 | 3. Analysis + scores | 15–20 | report + `scores.json`, unit-tested |
 | 4. Dashboard + leak view | 20–26 | scoreboard, leak graph, methodology page |
 | 5. Runner + more networks | 26–30 | scheduled runs; Nym/Nox if Phase 0 allowed |
-| 6. Submission | 30–36 | README, CROPS, feedback |
+| 6. Submission | 30–36 | README, feedback |
 
 **Scope cuts if behind (cut from the bottom):** history charts → provider matrix → "Test from my browser" → Nox → Nym.
 **The MVP that must ship:** observer + passthrough + tor-js + isolation experiment + scoreboard + leak graph.
@@ -360,11 +358,11 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
 
 6. Methodology summary plus a link to `docs/methodology.md`.
 7. Findings so far (fill in from real runs; for example, which isolation mechanism worked on which network).
-8. **`## CROPS`** — one or two lines per letter:
-   - **C:** what we control: observer domain and runner. If they disappear, the repo still runs anywhere with one command, and `scores.json` is reproducible. Networks are pinned by specifier hash.
-   - **O:** MIT; build and run from the repo alone.
-   - **P:** our observer sees only synthetic probe traffic (exit IPs, never visitor wallets). Visitor runs upload through Tor. Dashboard routes log no IPs. No analytics.
-   - **S:** no keys held (synthetic keys are discarded right after address generation). The proxy only allows read methods. Rate limits are in place.
+8. **`## Privacy and security`** — one or two lines each (supports the Anon-RPC story; we are not entering the CROPS track):
+   - **Control:** what we control: observer domain and runner. If they disappear, the repo still runs anywhere with one command, and `scores.json` is reproducible. Networks are pinned by specifier hash.
+   - **Open:** MIT; build and run from the repo alone.
+   - **Privacy:** our observer sees only synthetic probe traffic (exit IPs, never visitor wallets). Visitor runs upload through Tor. Dashboard routes log no IPs. No analytics.
+   - **Security:** no keys held (synthetic keys are discarded right after address generation). The proxy only allows read methods. Rate limits are in place.
 9. AI usage disclosure (ETHGlobal rule): state that the project was built with Claude Code, from this plan.
 10. License.
 
@@ -376,8 +374,8 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
   3. (0:50–1:30) Scoreboard: every network compared; the isolation verdicts; timing linkability vs jitter.
   4. (1:30–2:10) "Test from my browser," live.
   5. (2:10–2:40) `scores.json`: a wallet can choose the best network automatically; open source, runs every 30 min.
-  6. (2:40–3:00) The CROPS moment: observer logs show exit IPs only, nothing identifying.
-- Submit to EF **Best Use of Anon-RPC** and **Best CROPS App**.
+  6. (2:40–3:00) The privacy moment: observer logs show exit IPs only, nothing identifying.
+- Submit to EF **Best Use of Anon-RPC** only.
 
 **Done when:** a fresh clone runs from the README, and the deployed app is live. (No demo video: decided 2026-11-06.)
 
