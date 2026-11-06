@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.db
+*.db-*
+data/
+.env
+packages/web/public/anon-rpc-iframe.js
+test-results/
+playwright-report/
+spikes/out/
+packages/web/public/bundles/

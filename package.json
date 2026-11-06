@@ -1,0 +1,39 @@
+{
+  "name": "anonscope",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AnonScope — a live observatory for Anon-RPC networks",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.23.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n observer,web -c cyan,magenta \"pnpm --filter @anonscope/observer dev\" \"pnpm --filter @anonscope/web dev\"",
+    "build": "pnpm --filter @anonscope/web build",
+    "start": "pnpm --filter @anonscope/observer start",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck && tsc -p scripts/tsconfig.json",
+    "pin": "tsx scripts/pin-specifiers.ts && tsx scripts/fetch-bundles.ts",
+    "bundles": "tsx scripts/fetch-bundles.ts",
+    "seed": "tsx scripts/seed-demo.ts",
+    "runner": "pnpm --filter @anonscope/runner run once",
+    "runner:loop": "pnpm --filter @anonscope/runner run loop",
+    "check:dist": "node scripts/check-dist.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "viem": "^2.57.16",
+    "vitest": "^5.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

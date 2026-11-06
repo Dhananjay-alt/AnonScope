@@ -1,0 +1,18 @@
+{
+  "name": "@anonscope/runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "once": "tsx --env-file-if-exists=../../.env src/run.ts",
+    "loop": "tsx --env-file-if-exists=../../.env src/loop.ts",
+    "install-browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.65.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  }
+}
