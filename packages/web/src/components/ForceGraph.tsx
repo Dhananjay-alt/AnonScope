@@ -20,7 +20,8 @@ interface P {
   vy: number;
 }
 
-const COLORS = ["#60a5fa", "#a78bfa", "#34d399", "#f472b6", "#fbbf24", "#22d3ee", "#fb923c", "#a3e635"];
+// Wallet rings rotate through the DESIGN.md accent cast (white fill, coloured 2px ring).
+const COLORS = ["#097fe8", "#f64932", "#ffb110", "#62aef0", "#b18164", "#02093a", "#e89d01", "#0075de"];
 
 function init(n: number, w: number, h: number): P[] {
   return Array.from({ length: n }, (_, i) => {
@@ -94,7 +95,7 @@ export function ForceGraph({ wallets, edges, exitsByWallet, width = 540, height 
   const p = ps.current;
   return (
     <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`${wallets.length} wallets, ${edges.length} links`}>
-      <rect x="0" y="0" width={width} height={height} rx="8" fill="#0b1017" />
+      <rect x="0" y="0" width={width} height={height} rx="8" fill="#f6f5f4" />
       {edges.map((e, i) => {
         const a = p[idx.get(e.a) ?? -1];
         const b = p[idx.get(e.b) ?? -1];
@@ -106,7 +107,7 @@ export function ForceGraph({ wallets, edges, exitsByWallet, width = 540, height 
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke={e.kind === "ip" ? "#f87171" : "#fbbf24"}
+            stroke={e.kind === "ip" ? "#e32d14" : "#e89d01"}
             strokeWidth={e.kind === "ip" ? 2.5 : 2}
             strokeDasharray={e.kind === "timing" ? "6 5" : undefined}
             opacity={0.85}
@@ -119,15 +120,15 @@ export function ForceGraph({ wallets, edges, exitsByWallet, width = 540, height 
         return (
           <g key={w} transform={`translate(${q.x},${q.y})`}>
             <title>{`wallet ${w}${exitsByWallet?.[w] ? `\nexits: ${exitsByWallet[w]!.join(", ")}` : ""}`}</title>
-            <circle r="18" fill={COLORS[i % COLORS.length]} fillOpacity="0.9" stroke={COLORS[i % COLORS.length]} strokeWidth="2" />
-            <text textAnchor="middle" dy="4.5" fontSize="12" fill="#0b0f14" fontWeight="700" fontFamily="ui-monospace, monospace">
+            <circle r="19" fill="#ffffff" stroke={COLORS[i % COLORS.length]} strokeWidth="2.5" />
+            <text textAnchor="middle" dy="4.5" fontSize="12" fill="#000000" fontWeight="700" fontFamily="ui-monospace, monospace">
               w{w}
             </text>
           </g>
         );
       })}
       {wallets.length === 0 && (
-        <text x={width / 2} y={height / 2} textAnchor="middle" fill="#8a99ab" fontSize="13">
+        <text x={width / 2} y={height / 2} textAnchor="middle" fill="#757575" fontSize="13">
           no wallet traffic reached the observer
         </text>
       )}

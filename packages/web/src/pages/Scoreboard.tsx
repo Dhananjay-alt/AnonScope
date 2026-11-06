@@ -83,7 +83,9 @@ export function Scoreboard() {
 
   return (
     <>
-      <h1>Does Anon-RPC actually anonymize?</h1>
+      <h1>
+        Does Anon-RPC actually <span className="hl">anonymize</span>?
+      </h1>
       <p className="lede">
         AnonScope sends a fixed experiment suite through every Anon-RPC network to an RPC endpoint we run, which logs
         exactly what a provider would see: source IP, timing, headers. Five synthetic wallets of one "user" poll their

@@ -3,7 +3,7 @@ import { createApp } from "../src/app";
 import { rpcBody, setup } from "./helpers";
 
 const post = (body: string) => ({ method: "POST", headers: { "content-type": "application/json" }, body });
-const health = async (app: ReturnType<typeof setup>["app"]) => (await (await app.request("/api/health")).json()).egress;
+const health = async (app: ReturnType<typeof setup>["app"]) => ((await (await app.request("/api/health")).json()) as { egress: { over: boolean; bytes: number; capBytes: number; day: string } }).egress;
 
 describe("egress cap", () => {
   it("counts bytes per UTC day and reports them in /api/health", async () => {
@@ -32,7 +32,7 @@ describe("egress cap", () => {
     expect((await t.app.request("/healthz")).status).toBe(200);
     const h = await t.app.request("/api/health");
     expect(h.status).toBe(200);
-    expect((await h.json()).egress.over).toBe(true);
+    expect(((await h.json()) as { egress: { over: boolean } }).egress.over).toBe(true);
   });
 
   it("resets at the next UTC day and survives an app restart", async () => {

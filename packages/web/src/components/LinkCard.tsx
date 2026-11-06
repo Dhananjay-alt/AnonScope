@@ -41,8 +41,8 @@ export function LinkCard({
       {subtitle && <div className="muted small">{subtitle}</div>}
       <ForceGraph wallets={report.wallets} edges={report.edges} exitsByWallet={exitsByWallet(rows)} />
       <div className="legend">
-        <span><i style={{ background: "#f87171" }} />same exit IP</span>
-        <span><i style={{ background: "repeating-linear-gradient(90deg,#fbbf24 0 6px,transparent 6px 10px)" }} />timing only</span>
+        <span><i style={{ background: "#e32d14" }} />same exit IP</span>
+        <span><i style={{ background: "repeating-linear-gradient(90deg,#e89d01 0 6px,transparent 6px 10px)" }} />timing only</span>
       </div>
       <p className="verdict">
         {total === 0 ? (
