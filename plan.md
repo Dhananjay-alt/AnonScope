@@ -47,7 +47,7 @@ This is an idea EF explicitly listed for this track: *"network health checker / 
 | Could ship after the hackathon | Continuous scheduled runs, a public `scores.json` for wallets, MIT license, one-command deploy. |
 | Technical depth | Unlinkability methodology (IP and timing adversary), header-leak analysis, network overhead vs upstream time, per-network isolation-mechanism tests. |
 
-CROPS extras (for the second EF submission): MIT license, README `## CROPS` section, demo video ≤ 3 min, no trackers.
+CROPS extras (for the second EF submission): MIT license, README `## CROPS` section, no trackers.
 
 ---
 
@@ -159,7 +159,7 @@ Docs recommend **one long-lived worker per network**. Spec §9.1: the harness mu
 | 3. Analysis + scores | 15–20 | report + `scores.json`, unit-tested |
 | 4. Dashboard + leak view | 20–26 | scoreboard, leak graph, methodology page |
 | 5. Runner + more networks | 26–30 | scheduled runs; Nym/Nox if Phase 0 allowed |
-| 6. Submission | 30–36 | README, CROPS, feedback, demo video |
+| 6. Submission | 30–36 | README, CROPS, feedback |
 
 **Scope cuts if behind (cut from the bottom):** history charts → provider matrix → "Test from my browser" → Nox → Nym.
 **The MVP that must ship:** observer + passthrough + tor-js + isolation experiment + scoreboard + leak graph.
@@ -322,7 +322,7 @@ Pages (React Router, all assets bundled, no external fonts):
 3. **Test from my browser (`/test`)** — runs the visitor suite (§6.6) with a progress log, then shows the same graphs for the visitor's run. Explain that synthetic wallets are used, and that the report is fetched through Tor.
 4. **Methodology (`/methodology`)** — renders `docs/methodology.md`.
 
-Design: clean, dark, monospace numbers, no animation needed beyond the graph settling. Must work at 1280 px for the demo video.
+Design: clean, dark, monospace numbers, no animation needed beyond the graph settling. Must work at 1280 px for the live demo.
 
 **Done when:** all pages render from real data on the deployed app.
 
@@ -333,7 +333,7 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
 - `packages/runner/src/run.ts`: Playwright opens `${PUBLIC_ORIGIN}/run?mode=scheduled&networks=…` (use the headless mode from S5). It waits for a `window.__anonscopeDone` flag (timeout 15 min), and exits non-zero on failure.
 - Schedule: every 30 min. Use a Fly.io scheduled machine or a separate process with `setInterval`. If S5 required a headed browser, document running `pnpm runner:loop` on the dev laptop.
 - Add **Nym** and **Nox** (Sepolia upstream) if Phase 0 showed they work. Respect the `latencyOnly` flags.
-- `scripts/seed-demo.ts`: saves one known-good full run as a fixture for a backup demo, so the venue network can't ruin the video.
+- `scripts/seed-demo.ts`: saves one known-good full run as a fixture for a backup demo, so the venue network can't ruin the live demo.
 
 **Done when:** ≥ 3 consecutive scheduled runs complete on their own and the scoreboard updates.
 
@@ -370,7 +370,7 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
 
 ### Other files
 - `docs/feedback.md` — integration debrief for EF: time to first success, friction, missing docs, and the one improvement with the most impact. Include the isolation findings, and offer to upstream them (for example, comment on ethereum/anon-rpc issue #10).
-- `docs/demo-script.md` — ≤ 3 min:
+- `docs/demo-script.md` — live walkthrough for judging (no recorded video), ≤ 3 min:
   1. (0:00–0:20) Leak view, passthrough: "five wallets, one IP: the provider links them all, and here's my real IP."
   2. (0:20–0:50) The same wallets over tor-js with isolation keys: edges disappear (or don't, and here's the data).
   3. (0:50–1:30) Scoreboard: every network compared; the isolation verdicts; timing linkability vs jitter.
@@ -379,7 +379,7 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
   6. (2:40–3:00) The CROPS moment: observer logs show exit IPs only, nothing identifying.
 - Submit to EF **Best Use of Anon-RPC** and **Best CROPS App**.
 
-**Done when:** a fresh clone runs from the README, the deployed app is live, and the video is recorded.
+**Done when:** a fresh clone runs from the README, and the deployed app is live. (No demo video: decided 2026-11-06.)
 
 ---
 
@@ -401,5 +401,5 @@ Design: clean, dark, monospace numbers, no animation needed beyond the graph set
 - [ ] No IP logging outside `/rpc/*` (test passes).
 - [ ] No third-party scripts, fonts or analytics in `dist/`.
 - [ ] README traffic table matches the code.
-- [ ] Demo video ≤ 3 min. MIT license present. AI usage stated.
+- [ ] MIT license present. AI usage stated.
 - [ ] Asked the EF team in person: "Does a measurement tool whose reads all go through the harness count for Best Use of Anon-RPC?"

@@ -1,6 +1,8 @@
-# Demo script (≤ 3 min, 1280 px wide)
+# Demo script: live walkthrough (≤ 3 min, 1280 px wide)
 
-Before recording: `pnpm seed import fixtures/demo-run.json` (or set `SEED_FIXTURE`) on the deployed observer, so a known-good run is available even if the venue network fails. Open the tabs in advance: `/leak`, `/`, `/test`, `/api/scores.json`, and a terminal with `fly logs`.
+No recorded video; this is the order to show things live to judges.
+
+Before the demo: `pnpm seed import fixtures/demo-run.json` (or set `SEED_FIXTURE`) on the deployed observer, so a known-good run is available even if the venue network fails. Open the tabs in advance: `/leak`, `/`, `/test`, `/api/scores.json`, and a terminal with `fly logs`.
 
 **0:00–0:20 · Leak view, passthrough.** `/leak`, latest scheduled run, left graph.
 > "Five wallets, one user. Without anonymization the provider sees one IP and links all ten pairs. Red callout: 100% of requests came from my real IP. And here's the raw log: our endpoint saw exactly this."
