@@ -2,7 +2,7 @@
 
 AnonScope uses `@anon-rpc/browser-harness` 0.4.0 to drive passthrough, tor-js, Nym and Nox from one page and records what an RPC endpoint receives. These are our measurements and integration notes. Each one says where it was measured:
 
-- **Fly**: scheduled runs on Fly.io (Singapore, headless Chromium) against our observer, published at https://anonscope.fly.dev. Two runs as of 2026-11-06 10:00 UTC.
+- **Fly**: scheduled runs on Fly.io (Singapore, headless Chromium) against our observer, published at https://anonscope.fly.dev. Six completed runs as of 2026-11-06 16:00 UTC.
 - **Spike**: the Phase 0 spikes from a residential connection in Mumbai on 2026-11-06, echoing through `https://httpbin.org/anything` ([`spike-findings.md`](spike-findings.md)).
 - **Source**: reading the pinned worker bundles.
 
@@ -12,7 +12,7 @@ AnonScope uses `@anon-rpc/browser-harness` 0.4.0 to drive passthrough, tor-js, N
 
 - **Source:** none of the four pinned bundles (passthrough, tor-js, Nym, Nox) references `isolationKey` or `anonOptions`. The harness forwards the key as SPEC §9.1 requires, and the worker doesn't read it.
 - **Fly:** on passthrough and Nym, five wallets each using a distinct key arrived from a single exit IP. The provider could link all 10 wallet pairs, the same result as with no key.
-- **Spike:** Nox rotated across 3 exits per request whether a key was set or not. On Fly, the Nox keyed variants got no requests through (see "Nox availability" below), so there's no Fly measurement of Nox with a key yet.
+- **Fly + Spike, Nox:** Nox rotates across 3 exits per request whether a key is set or not. In its one complete Fly run (2026-11-06 10:25 UTC) the provider still linked all 10 pairs with a key, because 5 wallets polling within a minute always share an exit. In its other 5 Fly runs the keyed variants got no requests through (see "Nox availability" below).
 
 ### `x-anon-rpc-isolation` header (issue #10)
 
@@ -20,9 +20,9 @@ How each worker handled a request carrying `x-anon-rpc-isolation: <key>`:
 
 | worker | header at the destination | source |
 |---|---|---|
-| passthrough | forwarded unchanged | Fly (2/2 runs), Spike |
-| Nox | **forwarded unchanged** | Spike (5/5 requests to httpbin echoed the header back) |
-| Nym | not present | Fly (2/2 runs), Spike |
+| passthrough | forwarded unchanged | Fly (6/6 runs), Spike |
+| Nox | **forwarded unchanged** | Fly (30/30 requests in its complete run), Spike (5/5 requests to httpbin echoed the header back) |
+| Nym | not present | Fly (5/5 runs that booted), Spike |
 | tor-js | not measured (didn't boot) | — |
 
 So for passthrough and Nox, the per-account value a wallet puts in this header reaches the RPC provider. If #10 adopts a header-based mechanism, workers that don't know about it forward it by default. `anonOptions` stays inside the harness/worker boundary. We're happy to add these measurements to #10.
@@ -37,18 +37,19 @@ What a provider received (Fly and Spike agree):
 
 Each worker's set is constant across its users, so it identifies the network, not the user. The exception is passthrough, which carries the browser's own fingerprint. The guides don't currently say which outbound headers a worker should send.
 
-### Boot, latency, availability (Fly, median of 2 runs)
+### Boot, latency, availability (Fly, median of 6 runs)
 
-| | boot | p50 / p95 | overhead p50 | exits per run |
-|---|---|---|---|---|
-| passthrough | 117 ms | 196 / 220 ms | 16 ms | 1 |
-| Nym | 12.6 s | 1096 / 3234 ms | 921 ms | 1 (different each run) |
-| Nox | 2.3 s | 1206 / 2607 ms | 1028 ms | 3 |
-| tor-js | did not become ready in 120 s | — | — | — |
+| | booted | boot | p50 / p95 | overhead p50 | exits per run |
+|---|---|---|---|---|---|
+| passthrough | 6/6 | 109 ms | 196 / 220 ms | 15 ms | 1 |
+| Nym | 5/6 | 13.1 s | 1144 / 3808 ms | 973 ms | 1 (different each run) |
+| Nox | 6/6 | 5.6 s | 1199 / 2807 ms | 1010 ms | 3 (the same 3 every run) |
+| tor-js | 0/6 | did not become ready in 120 s | — | — | — |
 
 - **tor-js:** the gateway in `adopters.json5` (`152.236.3.22:12298`) answered `kps: HELLO timeout` from both the residential connection and Fly. Every Tor directory fetch then timed out. Nox's KPS transport worked from the same hosts at the same times.
-- **Nox availability:** in both Fly runs, the Nox worker answered 15/15 sequential `eth_blockNumber` calls. About 30 s into the next phase (5 wallets polling concurrently, under 1 request/s overall), calls began failing with `NoxWorkerError: network-error`. Every later call in the run failed too, over about 4 minutes. In the Spike session, the same suite completed all variants. We haven't identified the cause and can share worker logs (`acceptLog()`).
-- **Providers reachable through each network (E5, `eth_chainId` to 6 keyless providers):** passthrough 4/6, Nym 3/6 (llamarpc answered with a captcha page, merkle rate-limited, 1rpc failed), Nox 0/6 (during its failure window).
+- **Nox availability:** in 5 of 6 Fly runs, the Nox worker answered 15/15 sequential `eth_blockNumber` calls. About 30 s into the next phase (5 wallets polling concurrently, under 1 request/s overall), calls began failing with `NoxWorkerError: network-error`, and every later call in the run failed too. One Fly run (10:25 UTC) and the Spike session completed all variants.
+- **Nym availability:** healthy in 3 of 6 Fly runs; failed to boot once and lost a third to half of its requests in two runs. We haven't identified the cause and can share worker logs (`acceptLog()`).
+- **Providers reachable through each network (E5, `eth_chainId` to 6 keyless providers):** passthrough 3–4/6; Nym 3/6 at best (llamarpc answered with a captcha page, merkle rate-limited, 1rpc failed) and 0–1/6 in later runs; Nox 4/6 in its complete run, 0/6 during its failure window.
 
 ## Integration notes
 

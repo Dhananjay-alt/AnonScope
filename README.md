@@ -27,7 +27,7 @@ pnpm i
 pnpm pin        # build-time: read the specifier contracts → packages/shared/src/pins.json,
                 # then download + keccak-verify each worker bundle → packages/web/public/bundles/
 pnpm dev        # observer on :8787 + Vite on :5173 (proxying /api, /rpc, /whoami)
-pnpm test       # 69 unit tests (analysis, observer, privacy, egress cap, pacer, fixtures)
+pnpm test       # 72 unit tests (analysis, observer, privacy, egress cap, pacer, run budgets, fixtures)
 ```
 
 `pins.json` is committed, so `pnpm bundles` alone is enough if you don't want to re-read the chain.
@@ -164,6 +164,8 @@ Every network request the app makes:
 | Run claim, upload + report (scheduled) | runner browser → observer `/api` | ❌ (not RPC) | our own runner |
 | Run claim, upload + report (visitor; switched off while tor-js doesn't boot) | browser → **tor-js worker** → observer `/api` | ✅ | so the visitor's IP isn't linked to their run |
 | Dashboard, `scores.json`, app assets | browser → observer | n/a (not RPC) | static assets and results |
+| Network bootstrap | worker (in the harness sandbox) → that network's own entry points: tor-js KPS gateway, Nym gateways, Nox entry nodes | n/a (this *is* the anonymity network) | each network's transport; the entry point sees the prober's IP but not the encrypted request |
+| Cost guardrails (ops, not the app) | GitHub Actions watchdog / kill switch → Fly API (`flyctl`, Machines API) | n/a | stop machines on overspend or after the deadline; no user data |
 
 Check: `grep -rn "fetch(" packages/web/src`. The only raw `fetch` calls are `lib/api.ts` (dashboard `/api` GETs) and `experiments/runSuite.ts` (`/whoami`, and scheduled-mode `/api`). Every RPC read uses `worker.fetch` via `harness/rpc.ts`.
 
@@ -179,25 +181,28 @@ Full write-up: [`docs/methodology.md`](docs/methodology.md), also rendered at `/
 
 ## Findings so far
 
-From the scheduled runs on Fly.io (runner and observer in `sin`, headless Chromium, harness 0.4.0), as of 2026-11-06 10:00 UTC: **2 runs**, `c45dcf0b` and `d3182a6a`. The live scoreboard updates hourly. Spike results from a laptop are in [`docs/spike-findings.md`](docs/spike-findings.md) and aren't counted here.
+From the runs on Fly.io (runner and observer in `sin`, headless Chromium, harness 0.4.0), as of 2026-11-06 16:00 UTC: **6 completed runs** between 09:26 and 15:46 UTC (5 scheduled, the last started by hand after a redeploy). A 7th run (13:25) hit the runner's time limit and uploaded nothing; that led to the early-stop logic now in the runner. The live scoreboard updates hourly. Spike results from a laptop are in [`docs/spike-findings.md`](docs/spike-findings.md) and aren't counted here.
 
 | | passthrough | Nym | Nox | tor-js |
 |---|---|---|---|---|
-| boot (median) | 117 ms | 12.6 s | 2.3 s | did not boot (120 s timeout, 2/2 runs) |
-| latency p50 / p95 | 196 / 220 ms | 1096 / 3234 ms | 1206 / 2607 ms | — |
-| overhead vs upstream (p50) | 16 ms | 921 ms | 1028 ms | — |
-| error rate | 0% | 0% | 78% (see below) | — |
-| exit IPs seen per run | 1 (the runner's own) | 1 (a different one each run) | 3 (the same 3 in both runs) | — |
+| booted | 6/6 | 5/6 | 6/6 | 0/6 (120 s timeout) |
+| boot (median) | 109 ms | 13.1 s | 5.6 s | — |
+| latency p50 / p95 (median) | 196 / 220 ms | 1144 / 3808 ms | 1199 / 2807 ms | — |
+| overhead vs upstream (p50) | 15 ms | 973 ms | 1010 ms | — |
+| error rate (median; range) | 0% | 0% (0–57%) | 70% (0–83%) | — |
+| exit IPs seen per run | 1 (the runner's own) | 1 (a different one each run: 5 runs, 5 IPs) | 3 (the same 3 AWS IPs in every run) | — |
 | IP linkability, no key | 1.00 | 1.00 | 1.00 | — |
-| `anonOptions.isolationKey` | none (1.00) | none (1.00) | inconclusive (no requests got through) | inconclusive |
-| `x-anon-rpc-isolation` header | none (1.00), header reaches the provider | none (1.00), header doesn't reach the provider | inconclusive | inconclusive |
-| identifying headers at the provider | browser UA, `Accept-Language`, `Origin: null`, `Sec-Fetch-*`, the isolation header | fixed Chrome UA, `Accept-Language: en-US` | `User-Agent: Nox-Proxy/1.0` | — |
-| providers reachable through it (E5) | 4/6 | 3/6 | 0/6 | — |
+| `anonOptions.isolationKey` | none (1.00) | none (1.00) | none (1.00) in the one complete run; otherwise inconclusive | inconclusive |
+| `x-anon-rpc-isolation` header | none (1.00); header reaches the provider | none (1.00); header doesn't reach the provider | none (1.00); **header reaches the provider** (30/30) | inconclusive |
+| identifying headers at the provider | browser UA, `Accept-Language`, `Origin: null`, `Sec-Fetch-*`, the isolation header | fixed Chrome UA, `Accept-Language: en-US` | `User-Agent: Nox-Proxy/1.0`, the isolation header | — |
+| providers reachable through it (E5) | 3–4/6 | 3/6 at best, 0–1/6 in later runs | 4/6 in the complete run, 0/6 otherwise | — |
 
-- **Isolation keys don't separate wallets on any network that ran.** On passthrough and Nym, all five wallets of one user arrived from one IP in every variant, so the provider links all 10 pairs whether or not the wallet sets `isolationKey` or the header. That matches the bundles: none of the four pinned workers reads `anonOptions`.
-- **Nym** uses one exit per session. Across the two runs it was `217.118.194.66` and then `185.47.254.124`. It drops `x-anon-rpc-isolation`.
-- **Nox** spread the no-key requests over 3 AWS exits, but with 5 wallets polling within a minute, every pair still shared an exit (linkability 1.00). In both runs the Nox worker answered all 15 sequential E2 requests, then began returning `NoxWorkerError: network-error` about 30 s into the concurrent E3 phase and didn't recover for the rest of the run (E3 keyed variants and E5: 0 successes). Its isolation verdicts are therefore *inconclusive*, not *unsupported*. The cause isn't determined; a run from a residential connection in Mumbai earlier the same day completed all variants.
-- **tor-js** didn't boot from Fly either (as on day 1 from the laptop): the demo gateway in `adopters.json5` times out (`kps: HELLO timeout`). The scoreboard shows it as unavailable, and "Test from my browser", which runs over tor-js, is switched off.
+- **Isolation keys don't separate wallets on any network that ran.** On passthrough, Nym and (in its one complete run) Nox, the provider linked all 10 wallet pairs of one user in every variant, whether or not the wallet set `isolationKey` or the header. That matches the bundles: none of the four pinned workers reads `anonOptions`. Nox spreads requests over 3 exits, but with 5 wallets polling within a minute every pair still shares one.
+- **The isolation header leaks on passthrough and Nox.** Both forward `x-anon-rpc-isolation` to the RPC provider unchanged, so a per-account value a wallet puts there reaches the party it is meant to hide from. Nym drops it.
+- **Nym** uses one exit per session, a different one each run. It was healthy in 3 of 6 runs; it failed to boot once (11:25), and in two runs (10:25, 12:25) a third to half of its requests failed. In those degraded runs the verdict logic marked `isolationKey` "unsupported" because the keyed variant failed somewhat more than the others; with the no-key variant failing too, we read that as network instability, not as the key breaking Nym.
+- **Nox** completed every variant once (10:25). In the other 5 runs it answered the 15 sequential E2 calls, then began returning `NoxWorkerError: network-error` about 30 s into the concurrent E3 phase and didn't recover. The runner now stops a network after two all-failed variants in a row and marks it "cut short" (first seen in the 15:46 run). The cause isn't determined; a run from a residential connection in Mumbai earlier the same day completed all variants.
+- **tor-js** didn't boot in any Fly run (as on day 1 from the laptop): the demo gateway in `adopters.json5` times out (`kps: HELLO timeout`). The scoreboard shows it as unavailable, and "Test from my browser", which runs over tor-js, is switched off.
+- **The runner's "real IP" is a private Fly address** (`fdaa:…`). Runner and observer both run on Fly, so the runner's direct requests (`/whoami` and passthrough probes alike) reach the observer over Fly's private network. The real-IP leak metric compares like with like, so passthrough's 100% is a true leak; a provider outside Fly would see the runner's public egress IP instead.
 - **Timing linkability** is "—" everywhere: it only scores pairs that IP doesn't already link, and IP linked every pair.
 - **Specifier resolvers are third-party CDNs**, so a stock integration makes every user fetch the bundle from jsDelivr/unpkg at boot. AnonScope serves the hash-verified bytes itself.
 
