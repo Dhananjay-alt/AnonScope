@@ -26,7 +26,7 @@ for (const pin of PINS.pins) {
   let done = false;
   for (const url of pin.resolvers.filter((r) => r.startsWith("https:"))) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(180_000)  /* Nym is ~18 MB */ });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const bytes = new Uint8Array(await res.arrayBuffer());
       const got = keccak256(bytes);
@@ -42,6 +42,6 @@ for (const pin of PINS.pins) {
   if (!done) failed++;
 }
 if (failed) {
-  console.error(`${failed} bundle(s) could not be fetched; those networks fall back to the specifier's own resolvers`);
+  console.error(`${failed} bundle(s) could not be fetched; those networks fall back to the specifier's own resolvers. Run \`pnpm bundles\` again; bundles already fetched are kept.`);
   process.exitCode = 1;
 }
