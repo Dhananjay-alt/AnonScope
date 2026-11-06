@@ -2,10 +2,19 @@ import { serve } from "@hono/node-server";
 import { loadConfig } from "./config";
 import { openStore } from "./db";
 import { createApp } from "./app";
+import { readFileSync, existsSync } from "node:fs";
+import { importFixture, type Fixture } from "./fixture";
 
 const config = loadConfig();
 const store = openStore(config.dbPath);
 const sweeps: (() => void)[] = [];
+
+// Optional recorded backup run for demos (scripts/seed-demo.ts).
+const seed = process.env.SEED_FIXTURE;
+if (seed && existsSync(seed)) {
+  const f = JSON.parse(readFileSync(seed, "utf8")) as Fixture;
+  if (importFixture(store, f)) console.log(`imported fixture run ${f.run.runId}`);
+}
 
 const app = createApp({
   config,

@@ -1,0 +1,39 @@
+# Observer + dashboard on Fly.io. `*.fly.dev` gives public HTTPS without a domain.
+# Change `app` (it must be globally unique) and PUBLIC_ORIGIN to match.
+app = "anonscope"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/anonscope.db"
+  TRUSTED_IP_HEADER = "fly-client-ip"
+  PUBLIC_ORIGIN = "https://anonscope.fly.dev"
+  UPSTREAM_RPC_MAINNET = "https://ethereum-rpc.publicnode.com"
+  UPSTREAM_RPC_SEPOLIA = "https://ethereum-sepolia-rpc.publicnode.com"
+  # SEED_FIXTURE = "/app/fixtures/demo-run.json"
+
+[[mounts]]
+  source = "anonscope_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

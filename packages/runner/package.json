@@ -6,7 +6,8 @@
   "scripts": {
     "once": "tsx --env-file-if-exists=../../.env src/run.ts",
     "loop": "tsx --env-file-if-exists=../../.env src/loop.ts",
-    "install-browser": "playwright install chromium"
+    "install-browser": "playwright install chromium",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "playwright": "^1.65.0",
